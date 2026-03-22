@@ -147,7 +147,7 @@ function BookCard({
             className="mt-1.5 w-full text-xs font-semibold bg-amber-700 hover:bg-amber-800
               active:bg-amber-900 text-white py-1.5 rounded-lg transition-colors"
           >
-            Buy Now
+            + Add to Cart
           </button>
         ) : (
           <div
@@ -169,70 +169,86 @@ function CartPanel({
   onRemove,
   onClear,
   onSend,
+  onClose,
   sending,
 }: {
   cartBooks: BookResponse[];
   onRemove: (id: number) => void;
   onClear: () => void;
   onSend: () => void;
+  onClose: () => void;
   sending: boolean;
 }) {
-  if (cartBooks.length === 0) return null;
   const total = cartBooks.reduce((s, b) => s + b.price, 0);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl shadow-2xl border border-amber-200 bg-white overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between bg-amber-700 text-white px-4 py-3">
-        <span className="font-semibold text-sm">
-          🛒 Cart ({cartBooks.length} {cartBooks.length === 1 ? 'book' : 'books'})
-        </span>
-        <button onClick={onClear} className="text-xs opacity-75 hover:opacity-100 underline">
-          Clear
-        </button>
-      </div>
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
 
-      {/* Items */}
-      <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
-        {cartBooks.map((b) => (
-          <div key={b.id} className="flex items-center gap-2 px-3 py-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-900 truncate">{b.title}</p>
-              {b.series && (
-                <p className="text-[10px] text-amber-700 truncate">
-                  {b.series}{b.series_number != null ? ` #${b.series_number}` : ''}
-                </p>
-              )}
+      {/* Drawer */}
+      <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between bg-amber-700 text-white px-4 py-4">
+          <span className="font-bold text-base">
+            🛒 Your Cart ({cartBooks.length} {cartBooks.length === 1 ? 'book' : 'books'})
+          </span>
+          <button onClick={onClose} className="text-2xl leading-none opacity-75 hover:opacity-100">×</button>
+        </div>
+
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+          {cartBooks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+              <span className="text-3xl mb-2">🛒</span>
+              <p className="text-sm">Your cart is empty</p>
+              <button onClick={onClose} className="mt-3 text-amber-700 text-sm underline">Browse books</button>
             </div>
-            <span className="text-xs font-semibold text-gray-800 shrink-0">
-              ${(b.price / 100).toFixed(2)}
-            </span>
-            <button
-              onClick={() => onRemove(b.id)}
-              className="text-gray-300 hover:text-red-500 text-sm transition-colors shrink-0"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
+          ) : (
+            cartBooks.map((b) => (
+              <div key={b.id} className="flex items-center gap-3 px-4 py-3">
+                {b.cover_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={b.cover_url} alt="" className="w-8 h-12 object-contain rounded shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 leading-tight truncate">{b.title}</p>
+                  <p className="text-xs text-gray-400 truncate">{b.author}</p>
+                  {b.series && (
+                    <p className="text-xs text-amber-700 truncate">
+                      {b.series}{b.series_number != null ? ` #${b.series_number}` : ''}
+                    </p>
+                  )}
+                </div>
+                <span className="text-sm font-bold text-gray-900 shrink-0">
+                  ${(b.price / 100).toFixed(2)}
+                </span>
+                <button onClick={() => onRemove(b.id)} className="text-gray-300 hover:text-red-500 transition-colors shrink-0 text-lg leading-none">×</button>
+              </div>
+            ))
+          )}
+        </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-amber-50">
-        <span className="text-sm font-bold text-gray-900">
-          Total: ${(total / 100).toFixed(2)}
-        </span>
-        <button
-          onClick={onSend}
-          disabled={sending}
-          className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700
-            disabled:opacity-50 text-white text-xs font-bold px-3 py-2 rounded-lg
-            transition-colors"
-        >
-          {sending ? 'Reserving…' : '💬 Send Cart'}
-        </button>
+        {/* Footer */}
+        <div className="border-t border-gray-100 bg-amber-50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-600 font-medium">Total</span>
+            <span className="text-xl font-bold text-gray-900">${(total / 100).toFixed(2)} SGD</span>
+          </div>
+          <button
+            onClick={onSend}
+            disabled={sending || cartBooks.length === 0}
+            className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700
+              disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-colors text-base"
+          >
+            {sending ? 'Reserving…' : '💬 Checkout via WhatsApp'}
+          </button>
+          <button onClick={onClear} className="w-full text-xs text-gray-400 hover:text-gray-600 underline">
+            Clear cart
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -263,6 +279,7 @@ export default function ShopPage() {
   // Cart
   const [cartIds, setCartIds] = useState<Set<number>>(new Set());
   const [sending, setSending] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   // Fetch books
   const fetchBooks = useCallback(async () => {
@@ -316,25 +333,10 @@ export default function ShopPage() {
       return next;
     });
 
-  const handleBuyNow = async (book: BookResponse) => {
-    // Optimistic update
-    setBooks((prev) => prev.map((b) => b.id === book.id ? { ...b, status: 'reserved' } : b));
-    try {
-      const res = await fetch(`/api/books/${book.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'reserved' }),
-      });
-      if (!res.ok) {
-        await fetchBooks();
-        alert('This book was just reserved. Refreshing…');
-        return;
-      }
-    } catch {
-      await fetchBooks();
-      return;
-    }
-    window.open(buildBuyNowUrl(book), '_blank');
+  // "Buy Now" just adds to cart and opens the cart panel
+  const handleBuyNow = (book: BookResponse) => {
+    setCartIds((prev) => { const next = new Set(prev); next.add(book.id); return next; });
+    setCartOpen(true);
   };
 
   const handleSendCart = async () => {
@@ -361,6 +363,7 @@ export default function ShopPage() {
       }
       window.open(buildCartUrl(cartBooks), '_blank');
       setCartIds(new Set());
+      setCartOpen(false);
       await fetchBooks();
     } finally {
       setSending(false);
@@ -395,11 +398,17 @@ export default function ShopPage() {
             <h1 className="font-serif text-2xl font-bold text-amber-900">📚 Basti&apos;s Book Sale</h1>
             <p className="text-xs text-gray-500">Pre-loved books · Singapore</p>
           </div>
-          {cartIds.size > 0 && (
-            <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-amber-800 bg-amber-100 border border-amber-300 rounded-full px-3 py-1">
-              🛒 {cartIds.size} in cart
-            </div>
-          )}
+          <button
+            onClick={() => setCartOpen(true)}
+            className="relative flex items-center gap-2 bg-amber-700 hover:bg-amber-800 text-white font-semibold px-4 py-2 rounded-xl transition-colors"
+          >
+            🛒 Cart
+            {cartIds.size > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                {cartIds.size}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -522,13 +531,16 @@ export default function ShopPage() {
       </main>
 
       {/* ── Cart Panel ── */}
-      <CartPanel
-        cartBooks={cartBooks}
-        onRemove={toggleCart}
-        onClear={() => setCartIds(new Set())}
-        onSend={handleSendCart}
-        sending={sending}
-      />
+      {cartOpen && (
+        <CartPanel
+          cartBooks={cartBooks}
+          onRemove={toggleCart}
+          onClear={() => setCartIds(new Set())}
+          onSend={handleSendCart}
+          onClose={() => setCartOpen(false)}
+          sending={sending}
+        />
+      )}
     </div>
   );
 }
