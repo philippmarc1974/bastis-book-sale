@@ -79,6 +79,43 @@ function initSchema(db: Database.Database): void {
       amazon_price        INTEGER NOT NULL DEFAULT 0
     )
   `);
+
+  // Migration: add amazon_price column to existing databases
+  migrate(db);
+}
+
+function migrate(db: Database.Database): void {
+  // Check if amazon_price column exists
+  const cols = db.prepare("PRAGMA table_info(books)").all() as { name: string }[];
+  const hasAmazonPrice = cols.some((c) => c.name === 'amazon_price');
+
+  if (!hasAmazonPrice) {
+    db.exec('ALTER TABLE books ADD COLUMN amazon_price INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] Migration: added amazon_price column');
+  }
+
+  // Populate amazon_price from seed.json if all values are 0
+  const { total } = db.prepare('SELECT SUM(amazon_price) as total FROM books').get() as { total: number | null };
+  if ((total ?? 0) === 0) {
+    const seedPath = process.env.SEED_PATH || path.resolve(process.cwd(), 'data', 'seed.json');
+    if (fs.existsSync(seedPath)) {
+      const rows: { title: string; amazon_price?: number }[] = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+      const priceMap = new Map(rows.map((r) => [r.title, r.amazon_price ?? 0]));
+      const update = db.prepare('UPDATE books SET amazon_price = ? WHERE title = ?');
+      let updated = 0;
+      db.transaction(() => {
+        for (const [title, price] of priceMap) {
+          if (price > 0) {
+            const res = update.run(price, title);
+            updated += res.changes;
+          }
+        }
+      })();
+      if (updated > 0) {
+        console.log(`[db] Migration: populated amazon_price for ${updated} books`);
+      }
+    }
+  }
 }
 
 // ─── Seed ─────────────────────────────────────────────────────────────────────
