@@ -1,0 +1,33 @@
+app = "bastis-book-sale"
+primary_region = "sin"
+
+[build]
+
+[env]
+PORT = "3000"
+NODE_ENV = "production"
+SEED_PATH = "/app/seed.json"
+
+[mounts]
+source = "books_data"
+destination = "/app/data"
+
+[[services]]
+internal_port = 3000
+protocol = "tcp"
+auto_stop_machines = true
+auto_start_machines = true
+
+[[services.ports]]
+handlers = ["http"]
+port = 80
+force_https = true
+
+[[services.ports]]
+handlers = ["tls", "http"]
+port = 443
+
+[services.concurrency]
+type = "connections"
+hard_limit = 25
+soft_limit = 20

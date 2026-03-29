@@ -1,0 +1,7 @@
+node_modules
+.next
+data/books.db
+data/books.db-wal
+data/books.db-shm
+.git
+.env.local

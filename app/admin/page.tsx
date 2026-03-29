@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BookResponse } from '@/lib/db';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Status = 'available' | 'reserved' | 'sold';
+type SortKey = 'title' | 'author' | 'series' | 'price' | 'status' | 'format';
+type SortDir = 'asc' | 'desc';
 
 const STATUS_COLORS: Record<Status, string> = {
   available: 'bg-green-100 text-green-800 border-green-300',
@@ -15,7 +17,8 @@ const STATUS_COLORS: Record<Status, string> = {
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 
-function LoginScreen({ onLogin }: { onLogin: (pw: string) => Promise<string | null> }) {
+function LoginScreen({ onLogin }: { onLogin: (username: string, pw: string) => Promise<string | null> }) {
+  const [username, setUsername] = useState('');
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,7 +26,7 @@ function LoginScreen({ onLogin }: { onLogin: (pw: string) => Promise<string | nu
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const error = await onLogin(pw);
+    const error = await onLogin(username, pw);
     setLoading(false);
     if (error) setErr(error);
   };
@@ -37,15 +40,26 @@ function LoginScreen({ onLogin }: { onLogin: (pw: string) => Promise<string | nu
         <p className="text-xs text-gray-400 text-center mb-6">Basti&apos;s Book Sale</p>
         <form onSubmit={submit} className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoFocus
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-amber-400"
+              placeholder="Enter username"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input
               type="password"
               value={pw}
               onChange={(e) => setPw(e.target.value)}
-              autoFocus
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
                 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              placeholder="Enter admin password"
+              placeholder="Enter password"
             />
           </div>
           {err && <p className="text-red-500 text-sm">{err}</p>}
@@ -70,15 +84,17 @@ function StatsBar({ books }: { books: BookResponse[] }) {
   const reserved  = books.filter((b) => b.status === 'reserved').length;
   const sold      = books.filter((b) => b.status === 'sold').length;
   const total     = books.reduce((s, b) => s + b.price, 0);
+  const amazonTotal = books.reduce((s, b) => s + (b.amazon_price || 0), 0);
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
       {[
         { label: 'Total',      value: books.length, cls: 'bg-gray-50 text-gray-800' },
         { label: 'Available',  value: available,    cls: 'bg-green-50 text-green-800' },
         { label: 'Reserved',   value: reserved,     cls: 'bg-orange-50 text-orange-800' },
         { label: 'Sold',       value: sold,         cls: 'bg-red-50 text-red-800' },
-        { label: 'Value (avail.)', value: `$${(total / 100).toFixed(0)}`, cls: 'bg-amber-50 text-amber-800' },
+        { label: 'Selling Value', value: `$${(total / 100).toFixed(0)}`, cls: 'bg-amber-50 text-amber-800' },
+        { label: 'Amazon Value', value: `$${(amazonTotal / 100).toFixed(0)}`, cls: 'bg-blue-50 text-blue-800' },
       ].map((s) => (
         <div key={s.label} className={`${s.cls} rounded-xl p-4 text-center`}>
           <div className="text-2xl font-bold">{s.value}</div>
@@ -103,13 +119,41 @@ function BooksTable({
   const [editPriceId, setEditPriceId] = useState<number | null>(null);
   const [priceInput, setPriceInput] = useState('');
   const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('title');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-  const filtered = books.filter(
-    (b) =>
-      b.title.toLowerCase().includes(search.toLowerCase()) ||
-      b.author.toLowerCase().includes(search.toLowerCase()) ||
-      (b.series ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const sortIndicator = (key: SortKey) =>
+    sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return books
+      .filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          b.author.toLowerCase().includes(q) ||
+          (b.series ?? '').toLowerCase().includes(q) ||
+          b.status.toLowerCase().includes(q) ||
+          b.format.toLowerCase().includes(q)
+      )
+      .sort((a, b) => {
+        let cmp = 0;
+        switch (sortKey) {
+          case 'title':  cmp = a.title.localeCompare(b.title); break;
+          case 'author': cmp = a.author.localeCompare(b.author); break;
+          case 'series': cmp = (a.series ?? '').localeCompare(b.series ?? ''); break;
+          case 'price':  cmp = a.price - b.price; break;
+          case 'status': cmp = a.status.localeCompare(b.status); break;
+          case 'format': cmp = a.format.localeCompare(b.format); break;
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+  }, [books, search, sortKey, sortDir]);
 
   const patch = async (id: number, body: Record<string, unknown>) => {
     await fetch(`/api/admin/books/${id}`, {
@@ -143,13 +187,14 @@ function BooksTable({
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="p-4 border-b border-gray-100 flex items-center gap-3">
         <h2 className="font-semibold text-gray-900">All Books</h2>
+        <span className="text-xs text-gray-400">{filtered.length} results</span>
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search title, author, series…"
+          placeholder="Search title, author, series, status…"
           className="ml-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5
-            focus:outline-none focus:ring-2 focus:ring-amber-400 w-64"
+            focus:outline-none focus:ring-2 focus:ring-amber-400 w-72"
         />
       </div>
       <div className="overflow-x-auto">
@@ -157,12 +202,23 @@ function BooksTable({
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
             <tr>
               <th className="px-4 py-3 text-left">Cover</th>
-              <th className="px-4 py-3 text-left">Title / Author</th>
-              <th className="px-4 py-3 text-left">Series</th>
-              <th className="px-4 py-3 text-left">Format</th>
-              <th className="px-4 py-3 text-left">Price ✏️</th>
+              <th className="px-4 py-3 text-left cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('title')}>
+                Title / Author{sortIndicator('title')}
+              </th>
+              <th className="px-4 py-3 text-left cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('series')}>
+                Series{sortIndicator('series')}
+              </th>
+              <th className="px-4 py-3 text-left cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('format')}>
+                Format{sortIndicator('format')}
+              </th>
+              <th className="px-4 py-3 text-left cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('price')}>
+                Price{sortIndicator('price')}
+              </th>
+              <th className="px-4 py-3 text-left text-amber-600">Amazon (SGD)</th>
               <th className="px-4 py-3 text-left">Condition</th>
-              <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-left cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('status')}>
+                Status{sortIndicator('status')}
+              </th>
               <th className="px-4 py-3 text-left">Actions</th>
             </tr>
           </thead>
@@ -233,6 +289,13 @@ function BooksTable({
                       <span className="text-gray-300 group-hover:text-amber-500 text-xs">✏️</span>
                     </button>
                   )}
+                </td>
+
+                {/* Amazon Price (reference) */}
+                <td className="px-4 py-2 text-xs text-amber-600">
+                  {book.amazon_price > 0
+                    ? `$${(book.amazon_price / 100).toFixed(2)}`
+                    : '—'}
                 </td>
 
                 {/* Condition — click to toggle */}
@@ -419,7 +482,6 @@ function BulkImport({
   const buildPreview = () => {
     const lines = tsv.trim().split('\n').filter(Boolean);
     if (!lines.length) return;
-    // Auto-detect if first line is a header
     const firstLower = lines[0].toLowerCase();
     const hasHeader = firstLower.includes('title') || firstLower.includes('series');
     const dataLines = hasHeader ? lines.slice(1) : lines;
@@ -437,7 +499,6 @@ function BulkImport({
     setLoading(true);
     setMsg('');
     try {
-      // Build books array from preview
       const books = preview.map((r, i) => ({
         row_number:          1000 + i,
         series_author_group: r['Series / Author Group'] ?? '',
@@ -453,7 +514,6 @@ function BulkImport({
         condition:           'Good',
       }));
 
-      // Insert one by one via admin/books endpoint
       let added = 0;
       for (const book of books) {
         const res = await fetch('/api/admin/books', {
@@ -629,13 +689,13 @@ export default function AdminPage() {
     if (token) fetchBooks();
   }, [token, fetchBooks]);
 
-  const handleLogin = async (pw: string): Promise<string | null> => {
+  const handleLogin = async (username: string, pw: string): Promise<string | null> => {
     const res = await fetch('/api/admin/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
+      body: JSON.stringify({ username, password: pw }),
     });
-    if (!res.ok) return 'Invalid password.';
+    if (!res.ok) return 'Invalid credentials.';
     const { token: tok } = await res.json();
     localStorage.setItem('admin_token', tok);
     setToken(tok);

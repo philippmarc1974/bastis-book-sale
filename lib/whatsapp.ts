@@ -6,24 +6,11 @@ function fmt(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
-export function buildBuyNowUrl(book: BookResponse): string {
-  const series = book.series
-    ? ` (${book.series}${book.series_number != null ? ` #${book.series_number}` : ''})`
-    : '';
-  const lines = [
-    `Hi! I'd like to buy a book from Basti's Book Sale:`,
-    ``,
-    `📚 *${book.title}*${series}`,
-    `   Author: ${book.author}`,
-    `   Format: ${book.format} | Condition: ${book.condition}`,
-    `   Price: $${fmt(book.price)} SGD`,
-    ``,
-    `Is it still available?`,
-  ];
-  return `https://wa.me/${WA}?text=${encodeURIComponent(lines.join('\n'))}`;
-}
-
-export function buildCartUrl(books: BookResponse[]): string {
+export function buildCartUrl(
+  books: BookResponse[],
+  buyerName?: string,
+  buyerNumber?: string
+): string {
   const total = books.reduce((s, b) => s + b.price, 0);
   const bookLines = books.map((b, i) => {
     const series = b.series
@@ -31,14 +18,19 @@ export function buildCartUrl(books: BookResponse[]): string {
       : '';
     return `${i + 1}. *${b.title}*${series} — $${fmt(b.price)} SGD`;
   });
+
+  const greeting = buyerName
+    ? `Hi! My name is ${buyerName}${buyerNumber ? `, my number is ${buyerNumber}` : ''}. I'd like to buy:`
+    : `Hi! I'd like to buy these books from Basti's Book Sale:`;
+
   const lines = [
-    `Hi! I'd like to buy these books from Basti's Book Sale:`,
+    greeting,
     ``,
     ...bookLines,
     ``,
     `*Total: $${fmt(total)} SGD*`,
     ``,
-    `Are they all still available?`,
+    `Please confirm!`,
   ];
   return `https://wa.me/${WA}?text=${encodeURIComponent(lines.join('\n'))}`;
 }

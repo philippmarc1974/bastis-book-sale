@@ -4,7 +4,7 @@ import fs from 'fs';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type BookStatus = 'available' | 'reserved' | 'sold';
+export type BookStatus = 'available' | 'reserved' | 'sold' | 'not_in_collection';
 
 export interface RawBook {
   id: number;
@@ -22,6 +22,8 @@ export interface RawBook {
   condition: string;
   status: BookStatus;
   reserved_at: string | null;
+  pages: number | null;
+  amazon_price: number; // cents (SGD)
 }
 
 export interface BookResponse extends RawBook {
@@ -72,7 +74,9 @@ function initSchema(db: Database.Database): void {
       price               INTEGER NOT NULL DEFAULT 0,
       condition           TEXT    NOT NULL DEFAULT 'Good',
       status              TEXT    NOT NULL DEFAULT 'available',
-      reserved_at         TEXT
+      reserved_at         TEXT,
+      pages               INTEGER,
+      amazon_price        INTEGER NOT NULL DEFAULT 0
     )
   `);
 }
@@ -80,23 +84,29 @@ function initSchema(db: Database.Database): void {
 // ─── Seed ─────────────────────────────────────────────────────────────────────
 
 interface SeedRow {
-  '#': number | null;
-  'Series / Author Group': string;
-  Title: string;
-  Author: string;
-  'Series #': number | null;
-  Language: string;
-  Format: string;
-  Notes: string | null;
-  'Cover URL': string | null;
-  Description: string | null;
+  row_number: number | null;
+  series_author_group: string;
+  title: string;
+  author: string;
+  series_number: string | null;
+  language: string;
+  format: string;
+  notes: string | null;
+  cover_url: string | null;
+  description: string | null;
+  price: number;
+  condition: string;
+  status: string;
+  pages: number | null;
+  amazon_price: number | null;
 }
 
 function seedIfEmpty(db: Database.Database): void {
   const { n } = db.prepare('SELECT COUNT(*) as n FROM books').get() as { n: number };
   if (n > 0) return;
 
-  const seedPath = path.resolve(process.cwd(), 'data', 'seed.json');
+  // seed.json lives outside the /app/data volume mount so it's always accessible
+  const seedPath = process.env.SEED_PATH || path.resolve(process.cwd(), 'data', 'seed.json');
   if (!fs.existsSync(seedPath)) {
     console.warn('[db] seed.json not found, skipping seed');
     return;
@@ -107,25 +117,30 @@ function seedIfEmpty(db: Database.Database): void {
   const insert = db.prepare(`
     INSERT INTO books
       (row_number, series_author_group, title, author, series_number,
-       language, format, notes, cover_url, description, price, condition, status)
+       language, format, notes, cover_url, description, price, condition, status, pages, amazon_price)
     VALUES
       (@row_number, @series_author_group, @title, @author, @series_number,
-       @language, @format, @notes, @cover_url, @description, 500, 'Good', 'available')
+       @language, @format, @notes, @cover_url, @description, @price, @condition, @status, @pages, @amazon_price)
   `);
 
   const insertMany = db.transaction((data: SeedRow[]) => {
     for (const r of data) {
       insert.run({
-        row_number:          r['#'] ?? 0,
-        series_author_group: r['Series / Author Group'] ?? '',
-        title:               r['Title'],
-        author:              r['Author'] ?? '',
-        series_number:       r['Series #'] ?? null,
-        language:            r['Language'] ?? 'English',
-        format:              r['Format'] ?? 'Paperback',
-        notes:               r['Notes'] ?? null,
-        cover_url:           r['Cover URL'] ?? null,
-        description:         r['Description'] ?? null,
+        row_number:          r.row_number ?? 0,
+        series_author_group: r.series_author_group ?? '',
+        title:               r.title,
+        author:              r.author ?? '',
+        series_number:       r.series_number ?? null,
+        language:            r.language ?? 'English',
+        format:              r.format ?? 'Paperback',
+        notes:               r.notes ?? null,
+        cover_url:           r.cover_url ?? null,
+        description:         r.description ?? null,
+        price:               r.price ?? 500,
+        condition:           r.condition ?? 'Good',
+        status:              r.status ?? 'available',
+        pages:               r.pages ?? null,
+        amazon_price:        r.amazon_price ?? 0,
       });
     }
   });
@@ -167,6 +182,14 @@ export function getAllBooks(db: Database.Database): BookResponse[] {
   const rows = db
     .prepare('SELECT * FROM books ORDER BY row_number ASC')
     .all() as RawBook[];
+  return rows.map(toResponse);
+}
+
+export function getBooksBySeriesGroup(db: Database.Database, seriesGroup: string): BookResponse[] {
+  releaseExpired(db);
+  const rows = db
+    .prepare('SELECT * FROM books WHERE series_author_group = ? ORDER BY series_number ASC, row_number ASC')
+    .all(seriesGroup) as RawBook[];
   return rows.map(toResponse);
 }
 

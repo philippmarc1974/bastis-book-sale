@@ -1,160 +1,129 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BookResponse } from '@/lib/db';
-import { buildBuyNowUrl, buildCartUrl } from '@/lib/whatsapp';
+import { buildCartUrl } from '@/lib/whatsapp';
+import { slugify } from '@/lib/slugify';
+import { isDisplayable } from '@/lib/filters';
+import { useCart } from '@/lib/cart-context';
+import { CartPanel } from '@/components/CartPanel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SortField = 'title' | 'author' | 'series' | 'status' | 'price';
-type SortDir = 'asc' | 'desc';
-const STATUS_ORDER = { available: 0, reserved: 1, sold: 2 } as const;
+type SortMode = 'series' | 'author';
 
-// ─── BookCard ─────────────────────────────────────────────────────────────────
+interface SeriesGroup {
+  key: string;
+  slug: string;
+  seriesName: string;
+  displayName: string;
+  collectionLabel: string | null;
+  author: string;
+  books: BookResponse[];
+  availableIds: number[];
+  totalPrice: number;
+  coverUrl: string | null;
+}
 
-function BookCard({
-  book,
-  inCart,
-  onToggleCart,
-  onBuyNow,
+// ─── SetCard ──────────────────────────────────────────────────────────────────
+
+function SetCard({
+  group,
+  cartIds,
+  onAddSet,
 }: {
-  book: BookResponse;
-  inCart: boolean;
-  onToggleCart: (id: number) => void;
-  onBuyNow: (book: BookResponse) => void;
+  group: SeriesGroup;
+  cartIds: Set<number>;
+  onAddSet: (ids: number[]) => void;
 }) {
-  const available = book.status === 'available';
-  const reserved = book.status === 'reserved';
-  const sold = book.status === 'sold';
-
-  const statusBadge = available
-    ? 'bg-green-100 text-green-800 ring-1 ring-green-300'
-    : reserved
-    ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-300'
-    : 'bg-red-100 text-red-800 ring-1 ring-red-300';
-
-  const statusLabel = available ? 'Available' : reserved ? 'Reserved' : 'Sold';
+  const allInCart = group.availableIds.length > 0 && group.availableIds.every((id) => cartIds.has(id));
 
   return (
-    // Card width ~192px → at 96dpi ≈ 5.1cm; aspect-[2/3] → height ≈ 288px ≈ 7.6cm
-    <div
-      className={`relative flex flex-col w-48 rounded-xl bg-white shadow-sm border border-amber-100
-        transition-all duration-200
-        ${available ? 'hover:shadow-md hover:-translate-y-0.5' : 'opacity-75'}`}
-    >
-      {/* Cart checkbox */}
-      {available && (
-        <label className="absolute top-2 left-2 z-20 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={inCart}
-            onChange={() => onToggleCart(book.id)}
-            className="sr-only"
-          />
-          <span
-            className={`flex items-center justify-center w-5 h-5 rounded border-2 transition-colors
-              ${inCart
-                ? 'bg-amber-700 border-amber-700'
-                : 'bg-white/90 border-gray-300 hover:border-amber-500'}`}
-          >
-            {inCart && (
-              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                <polyline points="2,6 5,9 10,3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </span>
-        </label>
-      )}
-
-      {/* Cover image — aspect-[2/3] ≈ 7.5cm tall */}
-      <div className="relative w-full aspect-[2/3] bg-amber-50 rounded-t-xl overflow-hidden">
-        {/* Status overlay for non-available */}
-        {!available && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow
-                ${reserved ? 'bg-orange-500' : 'bg-red-600'}`}
-            >
-              {statusLabel}
-            </span>
+    <div className="relative flex flex-col w-56 rounded-xl bg-white border border-amber-100 shadow-md transition-all duration-200 hover:shadow-lg hover:border-amber-200 hover:-translate-y-0.5">
+      {/* Cover — clickable to series page */}
+      <Link href={`/series/${group.slug}`}>
+        <div className="relative w-full aspect-[2/3] bg-amber-50 rounded-t-xl overflow-hidden">
+          {group.coverUrl ? (
+            <Image
+              src={group.coverUrl}
+              alt={group.seriesName}
+              fill
+              className="object-cover"
+              sizes="224px"
+              unoptimized
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-gradient-to-b from-amber-50 to-amber-100">
+              <span className="text-4xl mb-2">📖</span>
+              <span className="text-xs text-amber-800 font-medium leading-tight">{group.displayName}</span>
+            </div>
+          )}
+          {/* Book count overlay */}
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-2.5">
+            <span className="text-white text-xs font-semibold">{group.books.length} books</span>
           </div>
-        )}
-
-        {book.cover_url ? (
-          <Image
-            src={book.cover_url}
-            alt={book.title}
-            fill
-            className="object-contain p-1"
-            sizes="192px"
-            unoptimized
-          />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center">
-            <span className="text-4xl mb-1">📚</span>
-            <span className="text-xs text-amber-700 font-medium leading-tight line-clamp-4">
-              {book.title}
-            </span>
-          </div>
-        )}
-      </div>
+        </div>
+      </Link>
 
       {/* Info */}
-      <div className="flex flex-col flex-1 p-2.5 gap-1">
-        <h3 className="text-sm font-semibold leading-tight line-clamp-2 text-gray-900">
-          {book.title}
-        </h3>
-        <p className="text-xs text-gray-500 line-clamp-1">{book.author}</p>
-        {book.series && (
-          <p className="text-xs text-amber-700 font-medium line-clamp-1">
-            {book.series}
-            {book.series_number != null ? ` #${book.series_number}` : ''}
-          </p>
+      <div className="flex flex-col flex-1 p-3 gap-2">
+        <Link href={`/series/${group.slug}`}>
+          <h3 className="text-sm font-bold leading-tight text-gray-900 hover:text-amber-700 transition-colors">{group.displayName}</h3>
+        </Link>
+        {group.collectionLabel && (
+          <span className="inline-block self-start text-[10px] bg-purple-100 text-purple-700 rounded-full px-2 py-0.5 font-semibold">
+            {group.collectionLabel}
+          </span>
         )}
+        <p className="text-xs text-gray-500">{group.author}</p>
 
-        {/* Badges row */}
-        <div className="flex flex-wrap gap-1 mt-0.5">
-          <span className="text-[10px] bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">
-            {book.format}
-          </span>
-          <span
-            className={`text-[10px] rounded px-1.5 py-0.5 font-medium
-              ${book.condition === 'Good'
-                ? 'bg-green-50 text-green-700'
-                : 'bg-yellow-50 text-yellow-700'}`}
-          >
-            {book.condition}
-          </span>
-          {book.language === 'German' && (
-            <span className="text-[10px] bg-blue-50 text-blue-700 rounded px-1.5 py-0.5">DE</span>
-          )}
+        {/* Book list with status dots — each title links to book detail */}
+        <div className="space-y-1 mt-1">
+          {group.books.map((b) => (
+            <Link key={b.id} href={`/book/${b.id}`} className="flex items-center gap-2 text-xs group/item">
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  b.status === 'available'
+                    ? 'bg-green-500'
+                    : b.status === 'reserved'
+                    ? 'bg-orange-400'
+                    : 'bg-red-400'
+                }`}
+              />
+              <span className="truncate text-gray-600 leading-tight group-hover/item:text-amber-700 transition-colors">
+                {b.series_number ? `#${b.series_number} ` : ''}{b.title}{b.pages ? ` (${b.pages}p)` : ''}
+              </span>
+            </Link>
+          ))}
         </div>
 
-        {/* Price + status */}
-        <div className="mt-auto pt-1 flex items-center justify-between">
+        {/* Price + availability */}
+        <div className="mt-auto pt-2 flex items-center justify-between border-t border-amber-100">
+          <span className="text-xs text-gray-400">
+            {group.availableIds.length}/{group.books.length} available
+          </span>
           <span className="text-base font-bold text-gray-900">
-            ${(book.price / 100).toFixed(2)}
-          </span>
-          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${statusBadge}`}>
-            {statusLabel}
+            ${(group.totalPrice / 100).toFixed(0)}
           </span>
         </div>
 
-        {available ? (
+        {/* Button */}
+        {group.availableIds.length > 0 ? (
           <button
-            onClick={() => onBuyNow(book)}
-            className="mt-1.5 w-full text-xs font-semibold bg-amber-700 hover:bg-amber-800
-              active:bg-amber-900 text-white py-1.5 rounded-lg transition-colors"
+            onClick={() => onAddSet(group.availableIds)}
+            className={`w-full text-xs font-semibold py-2 rounded-lg transition-all duration-200 ${
+              allInCart
+                ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                : 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm'
+            }`}
           >
-            + Add to Cart
+            {allInCart ? '✓ Series Added' : '+ Add Series to Cart'}
           </button>
         ) : (
-          <div
-            className={`mt-1.5 w-full text-xs font-semibold text-center py-1.5 rounded-lg
-              ${reserved ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}
-          >
-            {statusLabel}
+          <div className="w-full text-xs font-semibold text-center py-2 rounded-lg bg-gray-100 text-gray-400">
+            Sold Out
           </div>
         )}
       </div>
@@ -162,126 +131,19 @@ function BookCard({
   );
 }
 
-// ─── CartPanel ────────────────────────────────────────────────────────────────
-
-function CartPanel({
-  cartBooks,
-  onRemove,
-  onClear,
-  onSend,
-  onClose,
-  sending,
-}: {
-  cartBooks: BookResponse[];
-  onRemove: (id: number) => void;
-  onClear: () => void;
-  onSend: () => void;
-  onClose: () => void;
-  sending: boolean;
-}) {
-  const total = cartBooks.reduce((s, b) => s + b.price, 0);
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
-
-      {/* Drawer */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between bg-amber-700 text-white px-4 py-4">
-          <span className="font-bold text-base">
-            🛒 Your Cart ({cartBooks.length} {cartBooks.length === 1 ? 'book' : 'books'})
-          </span>
-          <button onClick={onClose} className="text-2xl leading-none opacity-75 hover:opacity-100">×</button>
-        </div>
-
-        {/* Items */}
-        <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-          {cartBooks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-              <span className="text-3xl mb-2">🛒</span>
-              <p className="text-sm">Your cart is empty</p>
-              <button onClick={onClose} className="mt-3 text-amber-700 text-sm underline">Browse books</button>
-            </div>
-          ) : (
-            cartBooks.map((b) => (
-              <div key={b.id} className="flex items-center gap-3 px-4 py-3">
-                {b.cover_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.cover_url} alt="" className="w-8 h-12 object-contain rounded shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 leading-tight truncate">{b.title}</p>
-                  <p className="text-xs text-gray-400 truncate">{b.author}</p>
-                  {b.series && (
-                    <p className="text-xs text-amber-700 truncate">
-                      {b.series}{b.series_number != null ? ` #${b.series_number}` : ''}
-                    </p>
-                  )}
-                </div>
-                <span className="text-sm font-bold text-gray-900 shrink-0">
-                  ${(b.price / 100).toFixed(2)}
-                </span>
-                <button onClick={() => onRemove(b.id)} className="text-gray-300 hover:text-red-500 transition-colors shrink-0 text-lg leading-none">×</button>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-gray-100 bg-amber-50 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-600 font-medium">Total</span>
-            <span className="text-xl font-bold text-gray-900">${(total / 100).toFixed(2)} SGD</span>
-          </div>
-          <button
-            onClick={onSend}
-            disabled={sending || cartBooks.length === 0}
-            className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700
-              disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-colors text-base"
-          >
-            {sending ? 'Reserving…' : '💬 Checkout via WhatsApp'}
-          </button>
-          <button onClick={onClear} className="w-full text-xs text-gray-400 hover:text-gray-600 underline">
-            Clear cart
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
-
-const SORT_OPTIONS: { field: SortField; label: string }[] = [
-  { field: 'title',  label: 'Title' },
-  { field: 'author', label: 'Author' },
-  { field: 'series', label: 'Series' },
-  { field: 'status', label: 'Availability' },
-  { field: 'price',  label: 'Price' },
-];
 
 export default function ShopPage() {
   const [books, setBooks] = useState<BookResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [selSeries, setSelSeries] = useState<string[]>([]);
-  const [selLang, setSelLang] = useState<string | null>(null);
   const [selFormat, setSelFormat] = useState<string | null>(null);
-  const [availOnly, setAvailOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('series');
 
-  // Sort
-  const [sortField, setSortField] = useState<SortField>('title');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  // Cart
-  const [cartIds, setCartIds] = useState<Set<number>>(new Set());
+  const { cartIds, toggleCart, addSet, clearCart, removeMany } = useCart();
   const [sending, setSending] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
 
-  // Fetch books
   const fetchBooks = useCallback(async () => {
     try {
       const res = await fetch('/api/books');
@@ -298,48 +160,54 @@ export default function ShopPage() {
     return () => clearInterval(timer);
   }, [fetchBooks]);
 
-  // Derived
-  const allSeries = useMemo(
-    () => Array.from(new Set(books.map((b) => b.series).filter(Boolean) as string[])).sort(),
+  const displayableBooks = useMemo(
+    () => books.filter((b) => isDisplayable(b)),
     [books]
   );
 
-  const displayed = useMemo(() => {
-    let out = books;
-    if (selSeries.length > 0) out = out.filter((b) => b.series && selSeries.includes(b.series));
-    if (selLang)   out = out.filter((b) => b.language === selLang);
-    if (selFormat) out = out.filter((b) => b.format === selFormat);
-    if (availOnly) out = out.filter((b) => b.status === 'available');
+  const seriesGroups = useMemo((): SeriesGroup[] => {
+    const groups = new Map<string, BookResponse[]>();
+    for (const book of displayableBooks) {
+      const key = book.series_author_group;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(book);
+    }
+    return Array.from(groups.entries())
+      .filter(([, bks]) => bks.some((b) => b.status !== 'not_in_collection'))
+      .map(([key, bks]) => {
+        const sorted = bks.sort((a, b) => (a.series_number ?? 999) - (b.series_number ?? 999));
+        const available = sorted.filter((b) => b.status === 'available');
+        const rawName = sorted[0].series ?? sorted[0].title;
+        const collectionMatch = rawName.match(/\s*Collection\s*(\d*)/i);
+        const displayName = collectionMatch ? rawName.replace(/\s*Collection\s*\d*/i, '').trim() || rawName : rawName;
+        const collectionLabel = collectionMatch ? `Collection${collectionMatch[1] ? ` ${collectionMatch[1]}` : ''}` : null;
+        return {
+          key,
+          slug: slugify(key),
+          seriesName: rawName,
+          displayName,
+          collectionLabel,
+          author: sorted[0].author,
+          books: sorted,
+          availableIds: available.map((b) => b.id),
+          totalPrice: available.reduce((s, b) => s + b.price, 0),
+          coverUrl: sorted.find((b) => b.cover_url)?.cover_url ?? null,
+        };
+      });
+  }, [displayableBooks]);
 
-    return [...out].sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case 'title':  cmp = a.title.localeCompare(b.title); break;
-        case 'author': cmp = a.author.localeCompare(b.author); break;
-        case 'series': cmp = (a.series ?? 'zzz').localeCompare(b.series ?? 'zzz'); break;
-        case 'status': cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]; break;
-        case 'price':  cmp = a.price - b.price; break;
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
+  const displayed = useMemo(() => {
+    let out = [...seriesGroups];
+    if (selFormat) out = out.filter((g) => g.books.some((b) => b.format === selFormat));
+    return out.sort((a, b) => {
+      if (sortMode === 'series') return a.seriesName.localeCompare(b.seriesName);
+      return a.author.localeCompare(b.author);
     });
-  }, [books, selSeries, selLang, selFormat, availOnly, sortField, sortDir]);
+  }, [seriesGroups, selFormat, sortMode]);
 
   const cartBooks = useMemo(() => books.filter((b) => cartIds.has(b.id)), [books, cartIds]);
 
-  const toggleCart = (id: number) =>
-    setCartIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
-  // "Buy Now" just adds to cart and opens the cart panel
-  const handleBuyNow = (book: BookResponse) => {
-    setCartIds((prev) => { const next = new Set(prev); next.add(book.id); return next; });
-    setCartOpen(true);
-  };
-
-  const handleSendCart = async () => {
+  const handleSendCart = async (name: string, number: string) => {
     if (cartBooks.length === 0) return;
     setSending(true);
     try {
@@ -351,18 +219,14 @@ export default function ShopPage() {
       if (!res.ok) {
         const data = await res.json();
         if (data.unavailableIds?.length) {
-          alert(`Some books are no longer available. Removing from cart.`);
-          setCartIds((prev) => {
-            const next = new Set(prev);
-            (data.unavailableIds as number[]).forEach((id) => next.delete(id));
-            return next;
-          });
+          alert('Some books are no longer available. Removing from cart.');
+          removeMany(data.unavailableIds as number[]);
           await fetchBooks();
         }
         return;
       }
-      window.open(buildCartUrl(cartBooks), '_blank');
-      setCartIds(new Set());
+      window.open(buildCartUrl(cartBooks, name, number), '_blank');
+      clearCart();
       setCartOpen(false);
       await fetchBooks();
     } finally {
@@ -370,41 +234,37 @@ export default function ShopPage() {
     }
   };
 
-  const toggleSort = (field: SortField) => {
-    if (field === sortField) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortField(field); setSortDir('asc'); }
-  };
-
-  const toggleSeriesFilter = (s: string) =>
-    setSelSeries((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-amber-50">
-        <div className="text-center text-amber-800">
-          <div className="text-5xl mb-4 animate-bounce">📚</div>
-          <p className="font-serif text-lg">Loading books…</p>
+        <div className="text-center">
+          <div className="text-5xl mb-4 animate-pulse">📚</div>
+          <p className="text-amber-800 text-lg tracking-wide">Loading books…</p>
         </div>
       </div>
     );
   }
 
+  const totalBooks = seriesGroups.reduce((s, g) => s + g.books.filter((b) => b.status !== 'not_in_collection').length, 0);
+
   return (
-    <div className="min-h-screen bg-amber-50">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-amber-200 shadow-sm">
-        <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-amber-50 text-gray-900">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-amber-200 shadow-sm">
+        <div className="max-w-screen-xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div>
-            <h1 className="font-serif text-2xl font-bold text-amber-900">📚 Basti&apos;s Book Sale</h1>
-            <p className="text-xs text-gray-500">Pre-loved books · Singapore</p>
+            <h1 className="text-2xl font-bold tracking-tight">
+              <span className="text-amber-700">Basti&apos;s</span> Book Sale
+            </h1>
+            <p className="text-xs text-gray-400 tracking-wide">Pre-loved books · Singapore · {totalBooks} books</p>
           </div>
           <button
             onClick={() => setCartOpen(true)}
-            className="relative flex items-center gap-2 bg-amber-700 hover:bg-amber-800 text-white font-semibold px-4 py-2 rounded-xl transition-colors"
+            className="relative flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 shadow-md"
           >
             🛒 Cart
             {cartIds.size > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                 {cartIds.size}
               </span>
             )}
@@ -412,130 +272,75 @@ export default function ShopPage() {
         </div>
       </header>
 
-      {/* ── Controls ── */}
-      <div className="max-w-screen-xl mx-auto px-4 pt-4 pb-2 space-y-3">
-        {/* Sort bar */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort:</span>
-          {SORT_OPTIONS.map(({ field, label }) => (
-            <button
-              key={field}
-              onClick={() => toggleSort(field)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1
-                ${sortField === field
-                  ? 'bg-amber-700 text-white border-amber-700'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-amber-500'}`}
-            >
-              {label}
-              {sortField === field && (
-                <span className="text-[10px]">{sortDir === 'asc' ? '↑' : '↓'}</span>
-              )}
+      {/* Controls */}
+      <div className="max-w-screen-xl mx-auto px-4 pt-5 pb-3 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center bg-white rounded-lg p-0.5 border border-amber-200">
+            <button onClick={() => setSortMode('series')}
+              className={`text-xs px-4 py-2 rounded-md font-medium transition-all duration-200 ${sortMode === 'series' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              By Series
             </button>
-          ))}
-        </div>
-
-        {/* Filter bar */}
-        <div className="flex flex-wrap items-start gap-3 p-3 bg-white rounded-xl border border-amber-100 shadow-sm">
-          {/* Series pills */}
-          {allSeries.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="text-xs font-semibold text-gray-400 mr-1">Series:</span>
-              {allSeries.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => toggleSeriesFilter(s)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors
-                    ${selSeries.includes(s)
-                      ? 'bg-amber-700 text-white border-amber-700'
-                      : 'bg-amber-50 text-amber-800 border-amber-200 hover:border-amber-500'}`}
-                >
-                  {s}
-                </button>
-              ))}
-              {selSeries.length > 0 && (
-                <button
-                  onClick={() => setSelSeries([])}
-                  className="text-xs text-gray-400 hover:text-gray-600 ml-1 underline"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Language + Format + Available-only */}
-          <div className="flex flex-wrap gap-2 items-center ml-auto">
-            <span className="text-xs font-semibold text-gray-400">Lang:</span>
-            {['English', 'German'].map((lang) => (
-              <button
-                key={lang}
-                onClick={() => setSelLang(selLang === lang ? null : lang)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors
-                  ${selLang === lang
-                    ? 'bg-amber-700 text-white border-amber-700'
-                    : 'bg-amber-50 text-amber-800 border-amber-200 hover:border-amber-500'}`}
-              >
-                {lang}
-              </button>
-            ))}
-            <span className="text-xs font-semibold text-gray-400 ml-2">Format:</span>
-            {['Hardcover', 'Paperback', 'Comic'].map((fmt) => (
-              <button
-                key={fmt}
-                onClick={() => setSelFormat(selFormat === fmt ? null : fmt)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors
-                  ${selFormat === fmt
-                    ? 'bg-amber-700 text-white border-amber-700'
-                    : 'bg-amber-50 text-amber-800 border-amber-200 hover:border-amber-500'}`}
-              >
+            <button onClick={() => setSortMode('author')}
+              className={`text-xs px-4 py-2 rounded-md font-medium transition-all duration-200 ${sortMode === 'author' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              By Author
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {['Hardcover', 'Paperback'].map((fmt) => (
+              <button key={fmt} onClick={() => setSelFormat(selFormat === fmt ? null : fmt)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-all duration-200 ${selFormat === fmt ? 'bg-amber-600 text-white border-amber-600' : 'text-gray-500 border-amber-200 hover:border-amber-400'}`}>
                 {fmt}
               </button>
             ))}
-            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer ml-2">
-              <input
-                type="checkbox"
-                checked={availOnly}
-                onChange={(e) => setAvailOnly(e.target.checked)}
-                className="rounded accent-amber-700"
-              />
-              Available only
-            </label>
           </div>
+          <span className="text-xs text-gray-400 ml-auto">{displayed.length} series · {totalBooks} books</span>
         </div>
 
-        <p className="text-xs text-gray-400">
-          Showing {displayed.length} of {books.length} books
-        </p>
       </div>
 
-      {/* ── Book Grid ── */}
-      <main className="max-w-screen-xl mx-auto px-4 pb-40">
-        {displayed.length === 0 ? (
-          <div className="text-center py-24 text-gray-400">
-            <div className="text-4xl mb-3">🔍</div>
-            <p>No books match your filters.</p>
-          </div>
-        ) : (
+      {/* Series cards grid */}
+      <main className="max-w-screen-xl mx-auto px-4 pb-32">
+        {displayed.length > 0 ? (
           <div className="flex flex-wrap gap-4">
-            {displayed.map((book) => (
-              <BookCard
-                key={book.id}
-                book={book}
-                inCart={cartIds.has(book.id)}
-                onToggleCart={toggleCart}
-                onBuyNow={handleBuyNow}
+            {displayed.map((group) => (
+              <SetCard
+                key={group.key}
+                group={group}
+                cartIds={cartIds}
+                onAddSet={addSet}
               />
             ))}
+          </div>
+        ) : (
+          <div className="text-center py-24 text-gray-400">
+            <div className="text-4xl mb-3">🔍</div>
+            <p>No series match your filters.</p>
           </div>
         )}
       </main>
 
-      {/* ── Cart Panel ── */}
+      {/* Floating cart button (mobile) */}
+      {cartIds.size > 0 && !cartOpen && (
+        <button onClick={() => setCartOpen(true)}
+          className="fixed bottom-6 right-6 z-40 bg-amber-600 hover:bg-amber-700 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-xl transition-all duration-200 md:hidden">
+          🛒
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-pulse">{cartIds.size}</span>
+        </button>
+      )}
+
+      {/* Footer with admin link */}
+      <footer className="max-w-screen-xl mx-auto px-4 py-8 text-center">
+        <Link href="/admin" className="text-xs text-gray-300 hover:text-gray-500 transition-colors">
+          Admin
+        </Link>
+      </footer>
+
+      {/* Cart Panel */}
       {cartOpen && (
         <CartPanel
           cartBooks={cartBooks}
           onRemove={toggleCart}
-          onClear={() => setCartIds(new Set())}
+          onClear={clearCart}
           onSend={handleSendCart}
           onClose={() => setCartOpen(false)}
           sending={sending}
