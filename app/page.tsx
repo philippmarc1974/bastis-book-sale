@@ -225,7 +225,7 @@ export default function ShopPage() {
         }
         return;
       }
-      window.open(buildCartUrl(cartBooks, name, number), '_blank');
+      window.location.href = buildCartUrl(cartBooks, name, number);
       clearCart();
       setCartOpen(false);
       await fetchBooks();
