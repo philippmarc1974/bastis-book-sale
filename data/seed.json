@@ -1661,7 +1661,7 @@
     "description": "Mac and Vince are back in business, running their problem-solving operation out of the fourth stall of the boys' bathroom. But this time, a mysterious new threat is targeting their operation, and someone is trying to take over their territory. As Mac investigates, he uncovers a conspiracy that goes deeper than any schoolyard prank, putting everything he has built at risk. With loyalties tested and enemies closing in, Mac must use all of his cunning to protect his friends and his business in this thrilling sequel.",
     "price": 300,
     "condition": "Good",
-    "status": "not_in_collection",
+    "status": "available",
     "pages": 288,
     "amazon_price": 1031
   },
@@ -1678,7 +1678,7 @@
     "description": "In the final installment of the Fourth Stall trilogy, Mac Barrett faces the biggest threat to his underground business empire yet. A powerful new adversary has emerged, one with connections that reach far beyond the schoolyard, and Mac and Vince must fight to save everything they have worked for. As alliances shift and old friends become uncertain allies, Mac discovers that being the school's fixer comes with a heavy price. This action-packed conclusion delivers plenty of twists, laughs, and heart as Mac learns what it truly means to stand up for what matters.",
     "price": 300,
     "condition": "Good",
-    "status": "not_in_collection",
+    "status": "available",
     "pages": 246,
     "amazon_price": 1031
   },
@@ -1864,8 +1864,8 @@
     "cover_url": "https://covers.openlibrary.org/b/id/7899527-M.jpg",
     "description": "In the epic conclusion to the Seven Wonders series, Jack McKinley and his friends face their most impossible challenge yet. With four of the seven Loculi recovered, the race to find the remaining three becomes a desperate struggle against time and powerful enemies. The Massa, the Karai Institute, and ancient forces all converge in a final battle that will determine the fate of Atlantis and the world. Jack must push his G7W powers to their limits and make the ultimate sacrifice to save his friends and prevent catastrophe.",
     "price": 400,
-    "condition": "—",
-    "status": "not_in_collection",
+    "condition": "Good",
+    "status": "available",
     "pages": 448,
     "amazon_price": 1095
   },
@@ -2154,7 +2154,7 @@
     "description": "In the fifth book of the Miss Peregrine's Peculiar Children series, Jacob Portman and his friends are on a desperate mission to find Noor Pradesh, a peculiar girl who holds the key to an ancient prophecy. Their search takes them across America, where they encounter new allies and terrifying new threats from both the peculiar and normal worlds. As the prophecy's true meaning becomes clearer, Jacob realizes the stakes are far higher than anyone imagined. With danger closing in from all sides, the peculiar children must trust in each other to survive what comes next.",
     "price": 800,
     "condition": "Good",
-    "status": "not_in_collection",
+    "status": "available",
     "pages": 336,
     "amazon_price": 1934
   },
@@ -3085,7 +3085,7 @@
     "language": "English",
     "format": "Paperback",
     "notes": null,
-    "cover_url": "https://covers.openlibrary.org/b/id/12818044-M.jpg",
+    "cover_url": "https://covers.openlibrary.org/b/isbn/9780312367541-M.jpg",
     "description": "Meg Murry is an awkward, stubborn girl whose scientist father has mysteriously disappeared. When three eccentric celestial beings, Mrs Whatsit, Mrs Who, and Mrs Which, reveal that Mr. Murry is being held captive on a distant planet by a terrible evil force called the Black Thing, Meg embarks on a mind-bending journey through space and time with her brilliant little brother Charles Wallace and her friend Calvin. Using a tesseract, a wrinkle in the fabric of space-time, the children travel to strange worlds and face unimaginable dangers. This groundbreaking classic explores themes of love, individuality, and the battle between light and darkness in a story that has captivated readers for generations.",
     "price": 400,
     "condition": "Good",
@@ -4122,7 +4122,7 @@
     "language": "English",
     "format": "Paperback",
     "notes": null,
-    "cover_url": "https://covers.openlibrary.org/b/id/10497827-M.jpg",
+    "cover_url": "https://covers.openlibrary.org/b/isbn/9781481409209-M.jpg",
     "description": "Owen Conners is a kid who wishes his life were more exciting, until the day he witnesses his classmate Bethany literally jump out of a book in the school library. It turns out Bethany is half-fictional, able to travel in and out of any book she wants, and she has been secretly searching for her missing father who disappeared into a story years ago. When Owen convinces Bethany to take him into his favorite book series, their adventure quickly spirals out of control and threatens to destroy the boundary between fiction and reality. This wildly imaginative first book in the Story Thieves series is a love letter to reading that will delight anyone who has ever wished they could live inside their favorite story.",
     "price": 500,
     "condition": "Good",
@@ -4177,7 +4177,7 @@
     "description": "Owen and Bethany journey into Jupiter City, a comic book world trapped in permanent darkness by a mysterious villain called the Dark. With the help of old friends and new allies, they fight to restore light to the city and discover a shocking connection between the Dark and Bethany's long-lost father, who disappeared into the fictional world years ago. As they dig deeper into the mystery, Bethany must confront painful truths about her family and the nature of fiction itself. This action-packed third installment in the Story Thieves series delivers superhero thrills alongside an emotional story about identity and belonging.",
     "price": 500,
     "condition": "Good",
-    "status": "not_in_collection",
+    "status": "available",
     "pages": 384,
     "amazon_price": 1134
   },
@@ -4194,7 +4194,7 @@
     "description": "In the epic conclusion to the Story Thieves series, the boundary between the fictional and real worlds is crumbling, and Owen and Bethany must find a way to save both before everything falls apart. The mysterious Nobody has set a terrifying plan in motion that threatens to erase all of fiction, taking every beloved character and story with it. Owen and Bethany must confront their deepest fears and make impossible choices as they race to stop the destruction. This thrilling finale brings together characters from across the series in a celebration of the power of stories and the courage it takes to write your own ending.",
     "price": 500,
     "condition": "Good",
-    "status": "not_in_collection",
+    "status": "available",
     "pages": 512,
     "amazon_price": 1134
   },
@@ -4296,7 +4296,7 @@
     "description": "In the third and final installment of the Moon Base Alpha series, Dash Gibson faces his biggest challenge yet when a series of catastrophic events threaten to destroy the entire lunar base. As systems fail and suspicions mount, Dash must determine whether the crisis is caused by mechanical failure, sabotage, or something even more sinister. With the lives of every colonist hanging in the balance and no help coming from Earth, Dash races against time to uncover the truth. This gripping conclusion to the trilogy delivers all the humor, mystery, and scientific wonder that fans have come to expect.",
     "price": 500,
     "condition": "Good",
-    "status": "not_in_collection",
+    "status": "available",
     "pages": 352,
     "amazon_price": 1160
   },
